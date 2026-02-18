@@ -82,9 +82,10 @@ def process_interpolate_bin_from_uid(uid, db, e0=None):
         if e0 is None:
             e0 = find_e0(db, uid)
         comments = create_file_header(db, uid)
-        validate_path_exists(db, uid)
+        # validate_path_exists(db, uid)
 
-        path_to_file = validate_file_exists(path_to_file, file_type="interp")
+        # path_to_file = validate_file_exists(path_to_file, file_type="interp")
+        path_to_file = hdr.start["interp_filename"]
         print(f">>>Path to file {path_to_file}")
         # try:
         if experiment == "fly_energy_scan":

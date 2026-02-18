@@ -5,8 +5,8 @@ from xas.process import process_interpolate_bin_from_uid
 # from xas.tiled_io import load_interpolated_df_from_tiled
 
 
-# test uid provided by ?? on Februrary ??
-uid = ""
+# test uid provided by Lu Ma on Februrary 18
+uid = "187caec7-f260-4b10-8e0e-ed43e538afc2"
 
 # Create tiled client objects
 client = from_uri("https://tiled.nsls2.bnl.gov")
