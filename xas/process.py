@@ -11,6 +11,10 @@ from .xas_logger import get_logger
 from .xs3 import load_data_with_xs3
 
 from datetime import datetime
+from xas.metadata import generate_xdi_metadata_from_hdr
+from tiled.client import from_uri
+
+client = from_uri("https://tiled.nsls2.bnl.gov")['tst/sandbox/qas/processed']
 
 
 def clean_dict(raw_dict):
@@ -56,10 +60,10 @@ def average_roi_channels_xs3x(dataframe=None):
 
 def process_interpolate_bin_from_uid(uid, db, e0=None):
     logger = get_logger()
-
-    experiment = db[uid].start['experiment']
+    hdr = db[uid]
+    experiment = hdr.start['experiment']
     if experiment.startswith('fly'):
-        path_to_file = db[uid].start['interp_filename']
+        path_to_file = hdr.start['interp_filename']
         if e0 is None:
             e0 = find_e0(db, uid)
         comments = create_file_header(db, uid)
@@ -99,7 +103,13 @@ def process_interpolate_bin_from_uid(uid, db, e0=None):
         try:
             interpolated_df = interpolate(raw_df, key_base=key_base)
             logger.info(f'Interpolation successful for {path_to_file}')
-            save_interpolated_df_as_file(path_to_file, interpolated_df, comments)
+            # save_interpolated_df_as_file(path_to_file, interpolated_df, comments)
+            hdr.start["xdi"] = generate_xdi_metadata_from_hdr(hdr)
+            client.write_table(
+                interpolated_df,
+                metadata=hdr.start,
+                access_tags=[hdr.start["proposal"]],
+            )
         except:
             logger.info(f'Interpolation failed for {path_to_file}')
 
