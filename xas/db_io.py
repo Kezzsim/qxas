@@ -31,12 +31,14 @@ def load_apb_dataset_from_db(db, uid):
         apb_dataset = pd.DataFrame(apb_dataset)
     else:
         pass
-
-    apb_dataset.iloc[:, 1:] -= ch_offsets
-    apb_dataset.iloc[:, 1:] /= 1e6
+    
+    # Tiled returns data in a different dtype
+    apb_dtype = apb_dataset.astype('float64')
+    apb_dtype.iloc[:, 1:] -= ch_offsets
+    apb_dtype.iloc[:, 1:] /= 1e6
  #   apb_dataset.iloc[:, 1:] /= (10**ch_gains)
 
-    return apb_dataset, energy_dataset, angle_offset
+    return apb_dtype, energy_dataset, angle_offset
 
 
 
@@ -57,7 +59,7 @@ def translate_apb_dataset(apb_dataset, energy_dataset, angle_offset,):
             data_dict[column]=adc
 
     energy = pd.DataFrame()
-    energy['timestamp'] = energy_dataset['timestamp']
+    energy['timestamp'] = energy_dataset['ts_s']
     enc  = energy_dataset['encoder'].apply(lambda x: int(x) if int(x) <= 0 else -(int(x) ^ 0xffffff - 1))
 
 

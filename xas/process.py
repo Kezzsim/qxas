@@ -131,42 +131,43 @@ def process_interpolate_bin_from_uid(uid, db, e0=None):
             )
         except:
             logger.info(f"Interpolation failed for {path_to_file}")
+            # Enable this if you change filepath to a local one
+            try:
+                if e0 > 0:
+                    print(
+                        "Inside xas process try draw (e0 > 0) start time: ",
+                        datetime.now(),
+                    )
+                    # binned_df = rebin(interpolated_df, e0)
+                    binned_df = issrebin(interpolated_df, e0)
 
-        try:
-            if e0 > 0:
-                print(
-                    "Inside xas process try draw (e0 > 0) start time: ", datetime.now()
-                )
-                # binned_df = rebin(interpolated_df, e0)
-                binned_df = issrebin(interpolated_df, e0)
+                    logger.info(f"Binning successful for {path_to_file}")
+                    if experiment == "fly_energy_scan_apb":
+                        save_binned_df_as_file(
+                            path_to_file, binned_df, comments, reorder=True
+                        )
+                    elif experiment == "fly_energy_scan_xs3":
+                        binned_df = average_roi_channels(binned_df)
+                        save_binned_df_as_file(
+                            path_to_file, binned_df, comments, reorder=True
+                        )
+                    elif experiment == "fly_energy_scan_xs3x":
+                        binned_df = average_roi_channels_xs3x(binned_df)
+                        save_binned_df_as_file(
+                            path_to_file, binned_df, comments, reorder=True
+                        )
+                    else:
+                        save_binned_df_as_file(
+                            path_to_file, binned_df, comments, reorder=False
+                        )
+                    if draw_func_interp is not None:
+                        draw_func_interp(interpolated_df)
 
-                logger.info(f"Binning successful for {path_to_file}")
-                if experiment == "fly_energy_scan_apb":
-                    save_binned_df_as_file(
-                        path_to_file, binned_df, comments, reorder=True
-                    )
-                elif experiment == "fly_energy_scan_xs3":
-                    binned_df = average_roi_channels(binned_df)
-                    save_binned_df_as_file(
-                        path_to_file, binned_df, comments, reorder=True
-                    )
-                elif experiment == "fly_energy_scan_xs3x":
-                    binned_df = average_roi_channels_xs3x(binned_df)
-                    save_binned_df_as_file(
-                        path_to_file, binned_df, comments, reorder=True
-                    )
                 else:
-                    save_binned_df_as_file(
-                        path_to_file, binned_df, comments, reorder=False
-                    )
-                if draw_func_interp is not None:
-                    draw_func_interp(interpolated_df)
-
-            else:
-                print("Energy E0 is not defined")
-        except Exception as e:
-            logger.info(f"Binning failed for {path_to_file}")
-            print(e)
+                    print("Energy E0 is not defined")
+            except Exception as e:
+                logger.info(f"Binning failed for {path_to_file}")
+                print(e)
             pass
     elif experiment.startswith("diffraction"):
         pass
