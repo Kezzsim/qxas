@@ -3,6 +3,7 @@ from .rebinning import rebin as issrebin
 from .file_io import (
     load_dataset_from_files,
     create_file_header,
+    create_file_header_tiled,
     validate_file_exists,
     validate_path_exists,
     save_interpolated_df_as_file,
@@ -13,6 +14,10 @@ from .file_io import (
 
 from xas.db_io import (
     load_apb_dataset_from_db,
+    load_apb_dataset_from_tiled,
+    load_apb_trig_dataset_from_tiled,
+    load_xs3_dataset_from_tiled,
+    load_xs3x_dataset_from_tiled,
     translate_apb_dataset,
     load_apb_trig_dataset_from_db,
     load_xs3_dataset_from_db,
@@ -25,7 +30,7 @@ from .xas_logger import get_logger
 from .xs3 import load_data_with_xs3
 
 from datetime import datetime
-from xas.metadata import generate_xdi_metadata_from_hdr
+from xas.metadata import generate_xdi_metadata
 from tiled.client import from_uri
 
 client = from_uri("https://tiled.nsls2.bnl.gov")["tst/sandbox/qas/processed"]
@@ -121,7 +126,7 @@ def process_interpolate_bin_from_uid(uid, db, e0=None):
             logger.info(f"Interpolation successful for {path_to_file}")
             # save_interpolated_df_as_file(path_to_file, interpolated_df, comments)
             new_md = {
-                "xdi": generate_xdi_metadata_from_hdr(hdr),
+                "xdi": generate_xdi_metadata(hdr),
                 "interp_filename": path_to_file,
             }
             client.write_table(
@@ -367,3 +372,128 @@ def process_interpolate_bin_new(
                 pass
         elif experiment.startswith("diffraction"):
             pass
+
+
+def load_flyscan_dataset(tiled_client):
+    experiment = tiled_client.start["experiment"]
+
+    if experiment == "fly_energy_scan":
+        raw_df = load_dataset_from_files(db, uid)
+
+    elif experiment == "fly_energy_scan_apb":
+        apb_df, energy_df, energy_offset = load_apb_dataset_from_tiled(tiled_client)
+        raw_df = translate_apb_dataset(apb_df, energy_df, energy_offset)
+
+    elif experiment == "fly_energy_scan_xs3":
+        raise NotImplementedError("Need to update and test the `load_xs3_dataset_from_tiled` function.")
+
+        apb_df, energy_df, energy_offset = load_apb_dataset_from_tiled(tiled_client)
+        raw_df = translate_apb_dataset(apb_df, energy_df, energy_offset)
+
+        apb_trig_timestamps = load_apb_trig_dataset_from_tiled(tiled_client)
+        xs3_dict = load_xs3_dataset_from_tiled(tiled_client, apb_trig_timestamps)
+
+        raw_df = {**raw_df, **xs3_dict}
+
+    elif experiment == "fly_energy_scan_xs3x":
+        apb_df, energy_df, energy_offset = load_apb_dataset_from_tiled(tiled_client)
+        raw_df = translate_apb_dataset(apb_df, energy_df, energy_offset)
+
+        apb_trig_timestamps = load_apb_trig_dataset_from_tiled(tiled_client)
+        xs3_dict = load_xs3x_dataset_from_tiled(tiled_client, apb_trig_timestamps)
+        raw_df = {**raw_df, **xs3_dict}
+
+    return raw_df
+
+
+def find_key_base(tiled_client):
+    experiment = tiled_client.start["experiment"]
+    if experiment in ["fly_energy_scan", "fly_energy_scan_apb"]:
+        return "i0"
+    elif experiment in ["fly_energy_scan_xs3", "fly_energy_scan_xs3x"]:
+        return "CHAN1ROI1"
+    else:
+        raise ValueError(f"Experiment {experiment} not recognized. "
+                         "Cannot determine key_base for interpolation.")
+
+
+def process_interpolate_bin_with_tiled(tiled_client, e0=None):
+    logger = get_logger()
+
+    experiment = tiled_client.start["experiment"]
+    uid = tiled_client.start["uid"]
+
+    if experiment.startswith("fly"):
+        path_to_file = tiled_client.start["interp_filename"]
+        print(f">>>Path to file {path_to_file}")
+
+        if e0 is None:
+            e0 = float(tiled_client.start.get('e0', -1))
+
+        comments = create_file_header_tiled(tiled_client)
+
+        raw_df = load_flyscan_dataset(tiled_client)
+        key_base = find_key_base(tiled_client)
+
+        logger.info(f"Loading file successful for UID {uid}/{path_to_file}")
+
+        ### Run Interpolation
+        # try:
+        interpolated_df = interpolate(raw_df, key_base=key_base)
+
+        logger.info(f"Interpolation successful for {path_to_file}")
+
+        ### This needs to be moved outside ###
+        new_md = {
+            "xdi": generate_xdi_metadata(tiled_client),
+            "interp_filename": path_to_file,
+        }
+        # client.write_table(
+        #     interpolated_df,
+        #     metadata=new_md,
+        #     access_tags=[tiled_client.start["proposal"]],
+        # )
+        ###########
+
+        # except:
+            # logger.info(f"Interpolation failed for {path_to_file}")
+            # # Enable this if you change filepath to a local one
+            # try:
+
+        ### Run Binning
+        if e0 > 0:
+            print("Inside xas process try draw (e0 > 0) start time: ", datetime.now())
+            # binned_df = rebin(interpolated_df, e0)
+            binned_df = issrebin(interpolated_df, e0)
+
+            logger.info(f"Binning successful for {path_to_file}")
+            if experiment == "fly_energy_scan_apb":
+                save_binned_df_as_file(
+                    path_to_file, binned_df, comments, reorder=True
+                )
+            elif experiment == "fly_energy_scan_xs3":
+                binned_df = average_roi_channels(binned_df)
+                save_binned_df_as_file(
+                    path_to_file, binned_df, comments, reorder=True
+                )
+            elif experiment == "fly_energy_scan_xs3x":
+                binned_df = average_roi_channels_xs3x(binned_df)
+                save_binned_df_as_file(
+                    path_to_file, binned_df, comments, reorder=True
+                )
+            else:
+                save_binned_df_as_file(
+                    path_to_file, binned_df, comments, reorder=False
+                )
+            if draw_func_interp is not None:
+                draw_func_interp(interpolated_df)
+
+        else:
+            print("Energy E0 is not defined")
+            # except Exception as e:
+            #     logger.info(f"Binning failed for {path_to_file}")
+            #     print(e)
+            # pass
+    elif experiment.startswith("diffraction"):
+        pass
+

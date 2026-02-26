@@ -442,16 +442,18 @@ ghs_selected_gas_key_match = {
 key_match = {k: v["human_readable_key"] for k, v in metadata_dict.items()}
 
 
-def generate_xdi_metadata_from_hdr(hdr):
+def generate_xdi_metadata(tiled_client):
+
     output = {}
     for key, hr_key in key_match.items():
-        if key in hdr.start.keys():
-            value = hdr.start[key]
+        if key in tiled_client.start.keys():
+            value = tiled_client.start[key]
         elif key == "stop_time":
-            value = hdr.stop["time"]
+            value = tiled_client.stop["time"]
         else:
             value = "None"
         if (key == "time") or (key == "stop_time"):
             value = datetime.fromtimestamp(value).strftime("%m/%d/%Y  %H:%M:%S.%f")
         output[str(hr_key)] = str(value)
+
     return output
