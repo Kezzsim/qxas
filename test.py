@@ -1,12 +1,13 @@
 from tiled.client import from_uri
 from databroker import Broker
 
-from xas.process import process_interpolate_bin_from_uid
+from xas.process import process_interpolate_bin_from_uid, process_interpolate_bin_with_tiled
 # from xas.tiled_io import load_interpolated_df_from_tiled
 
 
 # test uid provided by Lu Ma on Februrary 18
-uid = "187caec7-f260-4b10-8e0e-ed43e538afc2"
+uid = "187caec7-f260-4b10-8e0e-ed43e538afc2"    # fly_energy_scan_apb
+# uid = "ae446a58-bb9c-4ff8-8675-30c6e7067131"    # fly_energy_scan_xs3x
 
 # Create tiled client objects
 client = from_uri("https://tiled.nsls2.bnl.gov")
@@ -20,7 +21,10 @@ db = Broker(qas_raw)
 def test():
     # TEST WRITING
     "Load raw data, align columns by interpolating and binning, and save the result."
-    process_interpolate_bin_from_uid(uid, db)
+    # process_interpolate_bin_from_uid(uid, db)
+
+
+    process_interpolate_bin_with_tiled(client["qas/migration"][uid])
 
     # TEST READING
     # "Read the processed data back from tiled with the method isstools uses"
