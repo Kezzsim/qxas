@@ -32,6 +32,8 @@ from .xs3 import load_data_with_xs3
 from datetime import datetime
 from xas.metadata import generate_xdi_metadata
 from tiled.client import from_uri
+import os
+from pathlib import Path
 
 client = from_uri("https://tiled.nsls2.bnl.gov")["tst/sandbox/qas/processed"]
 
@@ -385,7 +387,9 @@ def load_flyscan_dataset(tiled_client):
         raw_df = translate_apb_dataset(apb_df, energy_df, energy_offset)
 
     elif experiment == "fly_energy_scan_xs3":
-        raise NotImplementedError("Need to update and test the `load_xs3_dataset_from_tiled` function.")
+        raise NotImplementedError(
+            "Need to update and test the `load_xs3_dataset_from_tiled` function."
+        )
 
         apb_df, energy_df, energy_offset = load_apb_dataset_from_tiled(tiled_client)
         raw_df = translate_apb_dataset(apb_df, energy_df, energy_offset)
@@ -413,8 +417,10 @@ def find_key_base(tiled_client):
     elif experiment in ["fly_energy_scan_xs3", "fly_energy_scan_xs3x"]:
         return "CHAN1ROI1"
     else:
-        raise ValueError(f"Experiment {experiment} not recognized. "
-                         "Cannot determine key_base for interpolation.")
+        raise ValueError(
+            f"Experiment {experiment} not recognized. "
+            "Cannot determine key_base for interpolation."
+        )
 
 
 def process_interpolate_bin_with_tiled(tiled_client, e0=None):
@@ -428,7 +434,7 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
         print(f">>>Path to file {path_to_file}")
 
         if e0 is None:
-            e0 = float(tiled_client.start.get('e0', -1))
+            e0 = float(tiled_client.start.get("e0", -1))
 
         comments = create_file_header_tiled(tiled_client)
 
@@ -448,17 +454,18 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
             "xdi": generate_xdi_metadata(tiled_client),
             "interp_filename": path_to_file,
         }
-        # client.write_table(
-        #     interpolated_df,
-        #     metadata=new_md,
-        #     access_tags=[tiled_client.start["proposal"]],
-        # )
+        if os.getenv("TEST") == "1":
+            client.write_table(
+                interpolated_df,
+                metadata=new_md,
+                access_tags=["tst_sandbox"],
+            )
         ###########
 
         # except:
-            # logger.info(f"Interpolation failed for {path_to_file}")
-            # # Enable this if you change filepath to a local one
-            # try:
+        # logger.info(f"Interpolation failed for {path_to_file}")
+        # # Enable this if you change filepath to a local one
+        # try:
 
         ### Run Binning
         if e0 > 0:
@@ -466,27 +473,22 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
             # binned_df = rebin(interpolated_df, e0)
             binned_df = issrebin(interpolated_df, e0)
 
+            if os.getenv("TEST") == "1":
+                path_to_file = str(Path(__file__).parent / Path(path_to_file).name)
+
             logger.info(f"Binning successful for {path_to_file}")
             if experiment == "fly_energy_scan_apb":
-                save_binned_df_as_file(
-                    path_to_file, binned_df, comments, reorder=True
-                )
+                save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
             elif experiment == "fly_energy_scan_xs3":
                 binned_df = average_roi_channels(binned_df)
-                save_binned_df_as_file(
-                    path_to_file, binned_df, comments, reorder=True
-                )
+                save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
             elif experiment == "fly_energy_scan_xs3x":
                 binned_df = average_roi_channels_xs3x(binned_df)
-                save_binned_df_as_file(
-                    path_to_file, binned_df, comments, reorder=True
-                )
+                save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
             else:
-                save_binned_df_as_file(
-                    path_to_file, binned_df, comments, reorder=False
-                )
-            if draw_func_interp is not None:
-                draw_func_interp(interpolated_df)
+                save_binned_df_as_file(path_to_file, binned_df, comments, reorder=False)
+            # if draw_func_interp is not None:
+            #   draw_func_interp(interpolated_df)
 
         else:
             print("Energy E0 is not defined")
@@ -496,4 +498,3 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
             # pass
     elif experiment.startswith("diffraction"):
         pass
-
