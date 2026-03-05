@@ -32,6 +32,7 @@ from .xs3 import load_data_with_xs3
 from datetime import datetime
 from xas.metadata import generate_xdi_metadata
 from tiled.client import from_uri
+import pyarrow
 import os
 from pathlib import Path
 
@@ -131,11 +132,18 @@ def process_interpolate_bin_from_uid(uid, db, e0=None):
                 "xdi": generate_xdi_metadata(hdr),
                 "interp_filename": path_to_file,
             }
-            client.write_table(
-                interpolated_df,
+            table = pyarrow.Table.from_pandas(interpolated_df, preserve_index=False)
+            table_client = client.create_appendable_table(
+                schema=table.schema,
                 metadata=new_md,
-                access_tags=[hdr.start["proposal"]],
+                access_tags=["tst_sandbox"],
             )
+            table_client.append_partition(0, table)
+            # client.write_table(
+            #   interpolated_df,
+            #   metadata=new_md,
+            #   access_tags=[hdr.start["proposal"]],
+            # )
         except:
             logger.info(f"Interpolation failed for {path_to_file}")
             # Enable this if you change filepath to a local one
@@ -455,11 +463,19 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
             "interp_filename": path_to_file,
         }
         if os.getenv("TEST") == "1":
-            client.write_table(
-                interpolated_df,
+            # Change to "write appendable"
+            table = pyarrow.Table.from_pandas(interpolated_df, preserve_index=False)
+            table_client = client.create_appendable_table(
+                schema=table.schema,
                 metadata=new_md,
                 access_tags=["tst_sandbox"],
             )
+            table_client.append_partition(0, table)
+            # client.write_table(
+            #     interpolated_df,
+            #     metadata=new_md,
+            #     access_tags=["tst_sandbox"],
+            # )
         ###########
 
         # except:

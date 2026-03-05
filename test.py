@@ -23,7 +23,6 @@ def test():
     "Load raw data, align columns by interpolating and binning, and save the result."
     # process_interpolate_bin_from_uid(uid, db)
 
-
     process_interpolate_bin_with_tiled(client["qas/migration"][uid])
 
     # TEST READING
