@@ -36,7 +36,7 @@ import pyarrow
 import os
 from pathlib import Path
 
-client = from_uri("https://tiled.nsls2.bnl.gov")["tst/sandbox/qas/processed"]
+client = from_uri("https://tiled.nsls2.bnl.gov")["qas/processed"]
 
 
 def clean_dict(raw_dict):
