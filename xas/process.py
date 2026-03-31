@@ -1,3 +1,5 @@
+from time import sleep
+
 from .bin import rebin
 from .rebinning import rebin as issrebin
 from .file_io import (
@@ -36,7 +38,6 @@ import pyarrow
 import os
 from pathlib import Path
 
-client = from_uri("https://tiled.nsls2.bnl.gov")["qas/processed"]
 
 
 def clean_dict(raw_dict):
@@ -431,9 +432,11 @@ def find_key_base(tiled_client):
         )
 
 
-def process_interpolate_bin_with_tiled(tiled_client, e0=None):
+def process_interpolate_bin_with_tiled(tiled_client, tiled_writing_client, draw_func_interp=None, e0=None):
     logger = get_logger()
-
+    print("SLEEPING")
+    sleep(10)
+    tiled_client.refresh()
     experiment = tiled_client.start["experiment"]
     uid = tiled_client.start["uid"]
 
@@ -462,20 +465,20 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
             "xdi": generate_xdi_metadata(tiled_client),
             "interp_filename": path_to_file,
         }
-        if os.getenv("TEST") == "1":
-            # Change to "write appendable"
-            table = pyarrow.Table.from_pandas(interpolated_df, preserve_index=False)
-            table_client = client.create_appendable_table(
-                schema=table.schema,
-                metadata=new_md,
-                access_tags=["tst_sandbox"],
-            )
-            table_client.append_partition(0, table)
-            # client.write_table(
-            #     interpolated_df,
-            #     metadata=new_md,
-            #     access_tags=["tst_sandbox"],
-            # )
+        
+        # Change to "write appendable"
+        table = pyarrow.Table.from_pandas(interpolated_df, preserve_index=False)
+        table_client = tiled_writing_client.create_appendable_table(
+            schema=table.schema,
+            metadata=new_md,
+            access_tags=["lightshow_project"],
+        )
+        table_client.append_partition(0, table)
+        # client.write_table(
+        #     interpolated_df,
+        #     metadata=new_md,
+        #     access_tags=["qas_processed"],
+        # )
         ###########
 
         # except:
@@ -494,7 +497,8 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
 
             logger.info(f"Binning successful for {path_to_file}")
             if experiment == "fly_energy_scan_apb":
-                save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
+                # save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
+                print("Saved to TILED")
             elif experiment == "fly_energy_scan_xs3":
                 binned_df = average_roi_channels(binned_df)
                 save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
@@ -503,8 +507,8 @@ def process_interpolate_bin_with_tiled(tiled_client, e0=None):
                 save_binned_df_as_file(path_to_file, binned_df, comments, reorder=True)
             else:
                 save_binned_df_as_file(path_to_file, binned_df, comments, reorder=False)
-            # if draw_func_interp is not None:
-            #   draw_func_interp(interpolated_df)
+            if draw_func_interp is not None:
+               draw_func_interp(interpolated_df)
 
         else:
             print("Energy E0 is not defined")
