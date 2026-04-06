@@ -137,7 +137,7 @@ def process_interpolate_bin_from_uid(uid, db, e0=None):
             table_client = client.create_appendable_table(
                 schema=table.schema,
                 metadata=new_md,
-                access_tags=["tst_sandbox"],
+                access_tags=["lightshow_project"],
             )
             table_client.append_partition(0, table)
             # client.write_table(
