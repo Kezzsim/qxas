@@ -165,7 +165,7 @@ def translate_apb_dataset(apb_dataset, energy_dataset, angle_offset,):
 
     # Translate encoder values to energy and add to the data_dict
     enc = energy_dataset['encoder'].apply(lambda x: int(x) if int(x) <= 0 else -(int(x) ^ 0xffffff - 1))
-    data_dict['energy'] = pd.DataFrame({"timestamp": energy_dataset['ts_s'],
+    data_dict['energy'] = pd.DataFrame({"timestamp": energy_dataset['ts_s'] + energy_dataset['ts_ns']/1E09,
                              "encoder": xray.encoder2energy(enc, 26222.222222222223, angle_offset)})
 
     return data_dict
