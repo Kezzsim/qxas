@@ -1,4 +1,4 @@
-from time import sleep
+from threading import Event
 
 from .bin import rebin
 from .rebinning import rebin as issrebin
@@ -33,7 +33,7 @@ from .xs3 import load_data_with_xs3
 
 from datetime import datetime
 from xas.metadata import generate_xdi_metadata
-from tiled.client import from_uri
+from tiled.client import from_context, from_uri
 from tiled.queries import FullText
 import pyarrow
 import os
@@ -432,13 +432,62 @@ def find_key_base(tiled_client):
         )
 
 
+def wait_for_tiled_run(tiled_client, timeout=None):
+    """Return a completed run, waiting for its persisted Stop via WebSocket.
+
+    Subscribe to the run's direct parent: metadata updates for a node are
+    published on its parent's stream. TiledWriter persists Stop only after
+    flushing the run's data, unlike a RunEngine Stop callback which may arrive
+    before ingestion has finished. No data batches need to be transferred here.
+
+    Completed historical runs return immediately. ``timeout`` is an optional
+    maximum wait in seconds; ``None`` waits until Stop is persisted. The server
+    must have Tiled streaming enabled.
+    """
+    if tiled_client.metadata.get("stop"):
+        return tiled_client
+
+    uid = tiled_client.start["uid"]
+    parent = tiled_client.parent
+    completed = Event()
+
+    def read_run():
+        # Bypass any child metadata inlined in the parent's earlier snapshot.
+        return from_context(
+            tiled_client.context,
+            structure_clients=tiled_client.structure_clients,
+            node_path_parts=tiled_client.path_parts,
+        )
+
+    def on_metadata_updated(update):
+        if update.key == uid and update.metadata.get("stop"):
+            completed.set()
+
+    with parent.subscribe() as subscription:
+        # Keep a strong reference to this callback while subscribed: Tiled's
+        # callback registry holds weak references.
+        subscription.child_metadata_updated.add_callback(on_metadata_updated)
+        subscription.start_in_thread()
+
+        # Check after connecting so a Stop written before/during connection
+        # cannot be missed, even if it has expired from the streaming cache.
+        run = read_run()
+        if run.metadata.get("stop"):
+            return run
+        if not completed.wait(timeout):
+            raise TimeoutError(f"Timed out waiting for Tiled run {uid} to finish")
+
+    # Retrieve a new client so its metadata and children reflect the ingested
+    # scan rather than the caller's pre-ingestion snapshot.
+    return read_run()
+
+
 def process_interpolate_bin_with_tiled(
-    tiled_client, tiled_writing_client, draw_func_interp=None, e0=None
+    tiled_client, tiled_writing_client, draw_func_interp=None, e0=None, *, timeout=None
 ):
+    """Process a scan once Tiled has persisted Stop (optionally within timeout)."""
     logger = get_logger()
-    print("SLEEPING")
-    sleep(10)
-    tiled_client.refresh()
+    tiled_client = wait_for_tiled_run(tiled_client, timeout=timeout)
     experiment = tiled_client.start["experiment"]
     uid = tiled_client.start["uid"]
 
@@ -528,11 +577,12 @@ def process_interpolate_bin_with_tiled(
         pass
 
 
-def process_interpolate_locally(tiled_client, draw_func_interp=None, e0=None):
+def process_interpolate_locally(
+    tiled_client, draw_func_interp=None, e0=None, *, timeout=None
+):
+    """Process a scan locally once Tiled has persisted its Stop document."""
     logger = get_logger()
-    print("SLEEPING")
-    sleep(10)
-    tiled_client.refresh()
+    tiled_client = wait_for_tiled_run(tiled_client, timeout=timeout)
     experiment = tiled_client.start["experiment"]
     uid = tiled_client.start["uid"]
 
