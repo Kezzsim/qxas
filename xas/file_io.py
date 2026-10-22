@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 from subprocess import call
+from string import Formatter
 import numpy as np
 import pandas as pd
 from . import xray
@@ -125,6 +126,15 @@ def validate_path_exists(db, uid):
         os.mkdir(path)
     else:
         print('...........Path exists')
+
+class _HeaderFormatter(Formatter):
+    """Keep unavailable metadata printable, including numeric header fields."""
+
+    def format_field(self, value, format_spec):
+        if value is None:
+            return 'N/A'
+        return super().format_field(value, format_spec)
+
 
 def create_file_header(db,uid):
     facility = db[uid]['start']['Facility']
@@ -251,7 +261,7 @@ def create_file_header(db,uid):
     # hutchB_ion_chamber_gas_it_Ar = hutchB_ionchamber_GasRate[4]
 
 
-    comments =   '# Facility: {}\n'\
+    comments = _HeaderFormatter().format('# Facility: {}\n'\
                  '# Beamline: {}\n'\
                  '# Year: {}\n' \
                  '# Cycle: {}\n' \
@@ -285,7 +295,7 @@ def create_file_header(db,uid):
                  '# DRIFTS table in hutch C: Horizontal(up): {} mm Horizontal(down): {} mm\n' \
                  '# DRIFTS table in hutch C: Vertical(up-in): {} mm Vertical(up-out): {} mm Vertical(down): {} mm\n' \
                  '# DRIFTS stage in hutch C: Z (rotation): {} mm X: {} mm\n' \
-                 '# Front End Mirror Horizontal Positions: Up: {:.2f} mm Down: {:.2f} mm\n#\n# '.format(
+                 '# Front End Mirror Horizontal Positions: Up: {:.2f} mm Down: {:.2f} mm\n#\n# ',
                   facility,
                   beamline,
                   year,
@@ -448,7 +458,7 @@ def create_file_header_tiled(tiled_client):
     # hutchB_ion_chamber_gas_it_Ar = hutchB_ionchamber_GasRate[4]
 
 
-    comments =   '# Facility: {}\n'\
+    comments = _HeaderFormatter().format('# Facility: {}\n'\
                  '# Beamline: {}\n'\
                  '# Year: {}\n' \
                  '# Cycle: {}\n' \
@@ -482,7 +492,7 @@ def create_file_header_tiled(tiled_client):
                  '# DRIFTS table in hutch C: Horizontal(up): {} mm Horizontal(down): {} mm\n' \
                  '# DRIFTS table in hutch C: Vertical(up-in): {} mm Vertical(up-out): {} mm Vertical(down): {} mm\n' \
                  '# DRIFTS stage in hutch C: Z (rotation): {} mm X: {} mm\n' \
-                 '# Front End Mirror Horizontal Positions: Up: {:.2f} mm Down: {:.2f} mm\n#\n# '.format(
+                 '# Front End Mirror Horizontal Positions: Up: {:.2f} mm Down: {:.2f} mm\n#\n# ',
                   facility,
                   beamline,
                   year,
@@ -642,5 +652,4 @@ def save_binned_df_as_hdf5_file(path_to_file, df, comments, reorder=False):
     print('creating_hdf5_file')
 
     return path_to_file
-
 
